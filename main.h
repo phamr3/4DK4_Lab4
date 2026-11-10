@@ -56,8 +56,9 @@ typedef struct _sender_slot_
   int tx_count;            /* number of times this packet was transmitted */
   int acked;               /* 1 once an ACK covering this packet is received */
   int needs_retx;          /* 1 if the timer expired and a retransmission is due */
-  int timer_active;
+  int timer_active;        /* per-packet timer (Selective-Repeat only) */
   long int timer_id;       /* event id of the pending timeout event */
+  Time last_tx_end;        /* end time of this packet's most recent transmission */
 } Sender_Slot, * Sender_Slot_Ptr;
 
 typedef struct _sender_
@@ -66,6 +67,9 @@ typedef struct _sender_
   long int base;           /* oldest unacknowledged sequence number */
   long int next_seq;       /* next new sequence number to use */
   int link_busy;           /* 1 while a data packet is being transmitted */
+  long int tx_seq;         /* sequence number on the link while link_busy */
+  int gbn_timer_active;    /* Go-Back-N: single timer for the oldest */
+  long int gbn_timer_id;   /*   unacknowledged packet (base) */
   Buffer_Ptr source_buffer;/* arrival times of waiting packets (Poisson source) */
 } Sender, * Sender_Ptr;
 

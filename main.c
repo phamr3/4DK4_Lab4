@@ -25,12 +25,13 @@
 
 /*
  * A single source sends packets to a single destination over one
- * point-to-point link using a general Selective-Repeat ARQ protocol with
- * send window Ws and receive window Wr (see simparameters.h):
+ * point-to-point link using a sliding-window ARQ protocol with send window
+ * Ws and receive window Wr (see simparameters.h):
  *
  *   Ws = Wr = 1  -> Stop-and-Wait
- *   Wr = 1       -> Go-Back-N
- *   otherwise    -> Selective-Repeat
+ *   Wr = 1       -> Go-Back-N (single timer for the oldest unACKed packet;
+ *                   on a timeout it and all later packets are resent)
+ *   otherwise    -> Selective-Repeat (one timer per packet)
  */
 
 /*******************************************************************************/
@@ -106,6 +107,9 @@ main(void)
     data.sender.base = 0;
     data.sender.next_seq = 0;
     data.sender.link_busy = 0;
+    data.sender.tx_seq = -1;
+    data.sender.gbn_timer_active = 0;
+    data.sender.gbn_timer_id = 0;
     data.sender.source_buffer = fifoqueue_new();
 
     /* Create and initialize the receiver. */
