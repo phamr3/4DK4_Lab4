@@ -14,16 +14,27 @@
 /*
  * The ARQ receiver (destination).
  *
- * The receiver accepts packets with sequence numbers in
- * [rcv_base, rcv_base + Wr). Packets are delivered to the upper layer in
- * order. Out-of-order packets inside the window are buffered until the
- * gap in front of them is filled.
+ * R_next (receiver->r_next) is the sequence number of the next in-order
+ * frame the receiver expects. Frames are delivered to the upper layer in
+ * order. Every ACK or NAK carries R_next, so it also tells the sender that
+ * every frame below R_next has been received.
  *
- * Every correctly received packet is answered with an ACK carrying:
- *   ack_seq       - the sequence number just received (selective ACK), or -1
- *                   if the packet was outside the window and discarded.
- *   next_expected - rcv_base after processing (cumulative ACK).
- * Packets received in error are dropped silently (no NAKs).
+ * Frames received in error are discarded with no response.
+ *
+ * Go-Back-N / Stop-and-Wait (Wr = 1):
+ *   seq == R_next : deliver it, R_next++, send ACK(R_next).
+ *   seq <  R_next : duplicate (its ACK was lost). Send ACK(R_next) again.
+ *   seq >  R_next : out of order. Discard, no response.
+ *
+ * Selective-Repeat (Wr > 1), receive window [R_next, R_next + Wr):
+ *   seq == R_next : deliver it and any buffered frames that follow it,
+ *                   advance R_next past them, send ACK(R_next).
+ *   seq >  R_next : out of order. Buffer it if it is inside the window.
+ *                   The first out-of-order frame of a gap is answered with
+ *                   NAK(R_next), asking the sender to resend frame R_next.
+ *                   Later out-of-order frames, until R_next arrives, are
+ *                   answered with ACK(R_next).
+ *   seq <  R_next : duplicate. Send ACK(R_next).
  */
 
 /*******************************************************************************/
@@ -54,12 +65,12 @@ schedule_data_reception_event(Simulation_Run_Ptr simulation_run,
 /*******************************************************************************/
 
 /*
- * Build an ACK and send it to the sender over the reverse link.
+ * Build an ACK (nak = 0) or NAK (nak = 1) carrying R_next and send it to
+ * the sender over the reverse link.
  */
 
 static void
-send_ack(Simulation_Run_Ptr simulation_run, long int ack_seq,
-	 long int next_expected)
+send_ack(Simulation_Run_Ptr simulation_run, int nak, long int r_next)
 {
   Simulation_Run_Data_Ptr data;
   Ack_Ptr ack;
@@ -69,10 +80,15 @@ send_ack(Simulation_Run_Ptr simulation_run, long int ack_seq,
   now = simulation_run_get_time(simulation_run);
 
   ack = (Ack_Ptr) xmalloc(sizeof(Ack));
-  ack->ack_seq = ack_seq;
-  ack->next_expected = next_expected;
+  ack->nak = nak;
+  ack->r_next = r_next;
   ack->errored = channel_packet_errored(ACK_PACKET_ERROR_PROB);
   if(ack->errored) data->ack_errors++;
+
+  if(nak) data->naks_sent++;
+  else data->acks_sent++;
+
+  TRACE(printf("%.3f: Send %s(%ld)\n", now, nak ? "NAK" : "ACK", r_next););
 
   schedule_ack_reception_event(simulation_run,
 			       channel_reverse_link_ack_arrival_time(data, now),
@@ -92,7 +108,7 @@ data_reception_event(Simulation_Run_Ptr simulation_run, void * ptr)
   Receiver_Ptr receiver;
   Receiver_Slot_Ptr rslot;
   Frame_Ptr frame;
-  long int seq, ack_seq;
+  long int seq;
   Time now;
 
   frame = (Frame_Ptr) ptr;
@@ -108,23 +124,19 @@ data_reception_event(Simulation_Run_Ptr simulation_run, void * ptr)
     return;
   }
 
-  if(seq >= receiver->rcv_base &&
-     seq < receiver->rcv_base + RECEIVE_WINDOW_SIZE) {
+  if(seq == receiver->r_next) {
 
-    /* Inside the receive window. Buffer it (if it is not a duplicate). */
-    rslot = RECEIVER_SLOT(receiver, seq);
-    if(!rslot->received) {
-      rslot->received = 1;
-      rslot->arrive_time = frame->arrive_time;
-    }
-    ack_seq = seq;
-
+    /* The expected frame. Deliver it, and (SR) every buffered frame that
+       is now in order. */
     TRACE(printf("%.3f: Packet seq %ld accepted\n", now, seq););
 
-    /* Deliver all packets that are now in order. */
-    while((rslot = RECEIVER_SLOT(receiver, receiver->rcv_base))->received) {
+    rslot = RECEIVER_SLOT(receiver, seq);
+    rslot->received = 1;
+    rslot->arrive_time = frame->arrive_time;
+
+    while((rslot = RECEIVER_SLOT(receiver, receiver->r_next))->received) {
       rslot->received = 0;
-      receiver->rcv_base++;
+      receiver->r_next++;
 
       data->packets_delivered++;
       data->accumulated_delay += now - rslot->arrive_time;
@@ -132,23 +144,51 @@ data_reception_event(Simulation_Run_Ptr simulation_run, void * ptr)
       output_blip_to_screen(simulation_run);
     }
 
-  } else if(seq < receiver->rcv_base) {
+    /* A new gap (if any) gets its own NAK. */
+    receiver->nak_sent = 0;
 
-    /* Already delivered. Its earlier ACK must have been lost or delayed,
-       so ACK it again. */
-    ack_seq = seq;
+    send_ack(simulation_run, 0, receiver->r_next);
+
+  } else if(seq < receiver->r_next) {
+
+    /* Already delivered. Its earlier ACK must have been lost, so ACK
+       again or the sender would resend it forever. */
     TRACE(printf("%.3f: Duplicate packet seq %ld\n", now, seq););
+
+    send_ack(simulation_run, 0, receiver->r_next);
+
+  } else if(RECEIVE_WINDOW_SIZE == 1) {
+
+    /* Go-Back-N: out of order. Discard with no response. */
+    TRACE(printf("%.3f: Packet seq %ld out of order (R_next %ld), discarded\n",
+		 now, seq, receiver->r_next););
 
   } else {
 
-    /* Beyond the receive window: discard. With Wr = 1 this happens to
-       every packet after a lost one (Go-Back-N). */
-    ack_seq = -1;
-    TRACE(printf("%.3f: Packet seq %ld out of window, discarded\n",
-		 now, seq););
-  }
+    /* Selective-Repeat: out of order. Buffer it if it fits in the
+       receive window. */
+    if(seq < receiver->r_next + RECEIVE_WINDOW_SIZE) {
+      rslot = RECEIVER_SLOT(receiver, seq);
+      if(!rslot->received) {
+	rslot->received = 1;
+	rslot->arrive_time = frame->arrive_time;
+      }
+      TRACE(printf("%.3f: Packet seq %ld out of order (R_next %ld), buffered\n",
+		   now, seq, receiver->r_next););
+    } else {
+      TRACE(printf("%.3f: Packet seq %ld beyond receive window, discarded\n",
+		   now, seq););
+    }
 
-  send_ack(simulation_run, ack_seq, receiver->rcv_base);
+    /* NAK the missing frame once; after that ACK(R_next) until it
+       arrives. */
+    if(!receiver->nak_sent) {
+      receiver->nak_sent = 1;
+      send_ack(simulation_run, 1, receiver->r_next);
+    } else {
+      send_ack(simulation_run, 0, receiver->r_next);
+    }
+  }
 
   xfree((void *) frame);
 }

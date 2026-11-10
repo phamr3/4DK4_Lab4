@@ -97,6 +97,8 @@ main(void)
     data.timeouts = 0;
     data.data_errors = 0;
     data.ack_errors = 0;
+    data.acks_sent = 0;
+    data.naks_sent = 0;
     data.accumulated_delay = 0.0;
     data.reverse_link_free_time = 0.0;
     data.random_seed = random_seed;
@@ -115,7 +117,8 @@ main(void)
     /* Create and initialize the receiver. */
     data.receiver.slots = (Receiver_Slot_Ptr)
       xcalloc((unsigned int) RECEIVE_WINDOW_SIZE, sizeof(Receiver_Slot));
-    data.receiver.rcv_base = 0;
+    data.receiver.r_next = 0;
+    data.receiver.nak_sent = 0;
 
     /* Get the source going. */
     if(SATURATED_SOURCE) {

@@ -87,7 +87,9 @@ typedef struct _receiver_slot_
 typedef struct _receiver_
 {
   Receiver_Slot_Ptr slots; /* RECEIVE_WINDOW_SIZE slots */
-  long int rcv_base;       /* next in-order sequence number expected */
+  long int r_next;         /* R_next: next in-order sequence number expected */
+  int nak_sent;            /* SR: 1 once NAK(R_next) has been sent for the
+			      current gap */
 } Receiver, * Receiver_Ptr;
 
 /*
@@ -103,15 +105,16 @@ typedef struct _frame_
 } Frame, * Frame_Ptr;
 
 /*
- * An acknowledgement on the reverse link. It carries both a selective ACK
- * (ack_seq, or -1 if none) and a cumulative ACK (next_expected: all
- * packets below this have been received in order).
+ * An ACK or NAK on the reverse link. Both carry R_next, the receiver's next
+ * expected in-order sequence number, so both tell the sender that every
+ * packet below R_next has been received. A NAK (Selective-Repeat only) also
+ * asks the sender to resend packet R_next.
  */
 
 typedef struct _ack_
 {
-  long int ack_seq;
-  long int next_expected;
+  int nak;                 /* 0 = ACK, 1 = NAK */
+  long int r_next;
   int errored;
 } Ack, * Ack_Ptr;
 
@@ -130,7 +133,9 @@ typedef struct _simulation_run_data_
   long int retransmissions;        /* data transmissions that were retransmissions */
   long int timeouts;
   long int data_errors;            /* data packets received in error */
-  long int ack_errors;             /* ACKs received in error */
+  long int ack_errors;             /* ACKs and NAKs received in error */
+  long int acks_sent;              /* ACKs sent by the receiver */
+  long int naks_sent;              /* NAKs sent by the receiver (SR only) */
   double accumulated_delay;        /* sum of (delivery time - arrival time) */
   unsigned random_seed;
 } Simulation_Run_Data, * Simulation_Run_Data_Ptr;

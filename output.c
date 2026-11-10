@@ -100,8 +100,11 @@ output_results(Simulation_Run_Ptr this_simulation_run)
   printf("Mean Transmissions per Delivered Pkt = %.4f\n",
 	 (double) sim_data->data_transmissions / sim_data->packets_delivered);
 
-  printf("Data Pkts in Error = %ld, ACKs in Error = %ld\n",
+  printf("Data Pkts in Error = %ld, ACKs/NAKs in Error = %ld\n",
 	 sim_data->data_errors, sim_data->ack_errors);
+
+  printf("ACKs Sent = %ld, NAKs Sent = %ld\n",
+	 sim_data->acks_sent, sim_data->naks_sent);
 
   printf("Mean Delay = %.3f ms\n",
 	 sim_data->accumulated_delay / sim_data->packets_delivered);

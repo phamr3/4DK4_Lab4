@@ -15,7 +15,11 @@
  *
  * Selective-Repeat (RECEIVE_WINDOW_SIZE > 1): each packet has its own timer,
  * started at the end of each of its transmissions. When a timer expires, only
- * that packet is retransmitted.
+ * that packet is retransmitted. A NAK(n) from the receiver also causes
+ * packet n to be retransmitted straight away.
+ *
+ * Every ACK and NAK carries the receiver's R_next, so it acknowledges every
+ * packet below R_next.
  */
 
 /*******************************************************************************/
@@ -107,6 +111,14 @@ void sender_try_transmit(Simulation_Run_Ptr simulation_run) {
 
     slot->needs_retx = 0;
     data->retransmissions++;
+
+    /* Selective-Repeat: a retransmission (e.g. after a NAK) replaces the
+       pending timer for the previous copy. The timer restarts when this
+       transmission ends. */
+    if(slot->timer_active) {
+      simulation_run_deschedule_event(simulation_run, slot->timer_id);
+      slot->timer_active = 0;
+    }
 
     TRACE(printf("%.3f: Retransmit seq %ld\n", now, slot->seq););
 
@@ -348,13 +360,15 @@ static void sender_mark_acked(Simulation_Run_Ptr simulation_run, Sender_Slot_Ptr
 /*******************************************************************************/
 
 /*
- * An ACK has arrived at the sender. Mark the packets it covers as
- * acknowledged, slide the send window, and try to send more.
+ * An ACK or NAK carrying R_next has arrived at the sender. Every packet
+ * below R_next has been received, so mark them acknowledged and slide the
+ * send window. A NAK also asks for packet R_next to be resent at once.
  */
 
 void ack_reception_event(Simulation_Run_Ptr simulation_run, void * ptr) {
   Simulation_Run_Data_Ptr data;
   Sender_Ptr sender;
+  Sender_Slot_Ptr slot;
   Ack_Ptr ack;
   long int s, upper, old_base;
 
@@ -362,27 +376,22 @@ void ack_reception_event(Simulation_Run_Ptr simulation_run, void * ptr) {
   data = (Simulation_Run_Data_Ptr) simulation_run_data(simulation_run);
   sender = &(data->sender);
 
-  /* A corrupted ACK is simply ignored. */
+  /* A corrupted ACK or NAK is simply ignored. */
   if(ack->errored) {
-    TRACE(printf("%.3f: ACK (seq %ld, next %ld) lost\n",
+    TRACE(printf("%.3f: %s(%ld) lost\n",
 		 simulation_run_get_time(simulation_run),
-		 ack->ack_seq, ack->next_expected););
+		 ack->nak ? "NAK" : "ACK", ack->r_next););
     xfree((void *) ack);
     return;
   }
 
-  TRACE(printf("%.3f: ACK received (seq %ld, next %ld)\n",
+  TRACE(printf("%.3f: %s(%ld) received\n",
 	       simulation_run_get_time(simulation_run),
-	       ack->ack_seq, ack->next_expected););
+	       ack->nak ? "NAK" : "ACK", ack->r_next););
 
-  /* Selective ACK for one packet. */
-  if(ack->ack_seq >= sender->base && ack->ack_seq < sender->next_seq) {
-    sender_mark_acked(simulation_run, SENDER_SLOT(sender, ack->ack_seq));
-  }
-
-  /* Cumulative ACK: everything below next_expected was received. */
-  upper = (ack->next_expected < sender->next_seq) ?
-    ack->next_expected : sender->next_seq;
+  /* Everything below R_next was received. */
+  upper = (ack->r_next < sender->next_seq) ?
+    ack->r_next : sender->next_seq;
 
   for(s = sender->base; s < upper; s++) {
     sender_mark_acked(simulation_run, SENDER_SLOT(sender, s));
@@ -399,6 +408,19 @@ void ack_reception_event(Simulation_Run_Ptr simulation_run, void * ptr) {
      (or stops if nothing is outstanding). */
   if(GO_BACK_N && sender->base != old_base) {
     gbn_update_timer(simulation_run);
+  }
+
+  /* NAK (Selective-Repeat): resend packet R_next ahead of new packets,
+     unless it is already queued for retransmission or on the link now. */
+  if(ack->nak && ack->r_next >= sender->base &&
+     ack->r_next < sender->next_seq) {
+    slot = SENDER_SLOT(sender, ack->r_next);
+    if(!slot->acked && !slot->needs_retx &&
+       !(sender->link_busy && sender->tx_seq == ack->r_next)) {
+      slot->needs_retx = 1;
+      TRACE(printf("%.3f: NAK -> resend seq %ld\n",
+		   simulation_run_get_time(simulation_run), ack->r_next););
+    }
   }
 
   xfree((void *) ack);

@@ -1,0 +1,42 @@
+0.000: Transmit new seq 0
+6.000: Packet seq 0 accepted
+6.000: Send ACK(1)
+11.000: ACK(1) received
+11.000: Transmit new seq 1
+17.000: Packet seq 1 accepted
+17.000: Send ACK(2)
+22.000: ACK(2) received
+22.000: Transmit new seq 2
+28.000: Packet seq 2 accepted
+28.000: Send ACK(3)
+33.000: ACK(3) lost
+38.000: Timeout seq 2, go back to 2
+38.000: Retransmit seq 2
+44.000: Duplicate packet seq 2
+44.000: Send ACK(3)
+49.000: ACK(3) lost
+54.000: Timeout seq 2, go back to 2
+54.000: Retransmit seq 2
+60.000: Duplicate packet seq 2
+60.000: Send ACK(3)
+65.000: ACK(3) lost
+70.000: Timeout seq 2, go back to 2
+70.000: Retransmit seq 2
+76.000: Duplicate packet seq 2
+76.000: Send ACK(3)
+81.000: ACK(3) received
+81.000: Transmit new seq 3
+87.000: Packet seq 3 received in error
+97.000: Timeout seq 3, go back to 3
+97.000: Retransmit seq 3
+103.000: Packet seq 3 accepted
+103.000: Send ACK(4)
+Protocol = Stop-and-Wait (Ws = 1, Wr = 1)
+p_d = 0.5000, p_a = 0.5000
+Delivered Pkts = 4, Simulated Time = 103.0 ms
+Throughput = 0.03883 (38.83 kbps)
+Data Transmissions = 8 (Retransmissions = 4, Timeouts = 4)
+Mean Transmissions per Delivered Pkt = 2.0000
+Data Pkts in Error = 1, ACKs/NAKs in Error = 4
+ACKs Sent = 7, NAKs Sent = 0
+Mean Delay = 10.000 ms

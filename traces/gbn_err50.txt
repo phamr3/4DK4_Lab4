@@ -1,0 +1,73 @@
+0.000: Transmit new seq 0
+1.000: Transmit new seq 1
+2.000: Transmit new seq 2
+3.000: Transmit new seq 3
+6.000: Packet seq 0 accepted
+6.000: Send ACK(1)
+7.000: Packet seq 1 accepted
+7.000: Send ACK(2)
+8.000: Packet seq 2 accepted
+8.000: Send ACK(3)
+9.000: Packet seq 3 accepted
+9.000: Send ACK(4)
+11.000: ACK(1) received
+11.000: Transmit new seq 4
+12.000: ACK(2) lost
+13.000: ACK(3) received
+13.000: Transmit new seq 5
+14.000: ACK(4) lost
+14.000: Transmit new seq 6
+17.000: Packet seq 4 accepted
+17.000: Send ACK(5)
+19.000: Timeout seq 3, go back to 3
+19.000: Retransmit seq 3
+19.000: Packet seq 5 received in error
+20.000: Packet seq 6 out of order (R_next 5), discarded
+20.000: Retransmit seq 4
+21.000: Retransmit seq 5
+22.000: ACK(5) received
+22.000: Retransmit seq 6
+23.000: Transmit new seq 7
+24.000: Transmit new seq 8
+25.000: Packet seq 3 received in error
+26.000: Duplicate packet seq 4
+26.000: Send ACK(5)
+27.000: Packet seq 5 received in error
+28.000: Packet seq 6 received in error
+29.000: Packet seq 7 out of order (R_next 5), discarded
+30.000: Packet seq 8 received in error
+31.000: ACK(5) received
+37.000: Timeout seq 5, go back to 5
+37.000: Retransmit seq 5
+38.000: Retransmit seq 6
+39.000: Retransmit seq 7
+40.000: Retransmit seq 8
+43.000: Packet seq 5 received in error
+44.000: Packet seq 6 received in error
+45.000: Packet seq 7 out of order (R_next 5), discarded
+46.000: Packet seq 8 out of order (R_next 5), discarded
+53.000: Timeout seq 5, go back to 5
+53.000: Retransmit seq 5
+54.000: Retransmit seq 6
+55.000: Retransmit seq 7
+56.000: Retransmit seq 8
+59.000: Packet seq 5 received in error
+60.000: Packet seq 6 received in error
+61.000: Packet seq 7 out of order (R_next 5), discarded
+62.000: Packet seq 8 received in error
+69.000: Timeout seq 5, go back to 5
+69.000: Retransmit seq 5
+70.000: Retransmit seq 6
+71.000: Retransmit seq 7
+72.000: Retransmit seq 8
+75.000: Packet seq 5 accepted
+75.000: Send ACK(6)
+Protocol = Go-Back-N (Ws = 4, Wr = 1)
+p_d = 0.5000, p_a = 0.5000
+Delivered Pkts = 6, Simulated Time = 75.0 ms
+Throughput = 0.08000 (80.00 kbps)
+Data Transmissions = 25 (Retransmissions = 16, Timeouts = 4)
+Mean Transmissions per Delivered Pkt = 4.1667
+Data Pkts in Error = 12, ACKs/NAKs in Error = 2
+ACKs Sent = 7, NAKs Sent = 0
+Mean Delay = 15.333 ms

@@ -1,0 +1,24 @@
+0.000: Transmit new seq 0
+6.000: Packet seq 0 accepted
+6.000: Send ACK(1)
+11.000: ACK(1) received
+11.000: Transmit new seq 1
+17.000: Packet seq 1 accepted
+17.000: Send ACK(2)
+22.000: ACK(2) received
+22.000: Transmit new seq 2
+28.000: Packet seq 2 accepted
+28.000: Send ACK(3)
+33.000: ACK(3) received
+33.000: Transmit new seq 3
+39.000: Packet seq 3 accepted
+39.000: Send ACK(4)
+Protocol = Stop-and-Wait (Ws = 1, Wr = 1)
+p_d = 0.0000, p_a = 0.0000
+Delivered Pkts = 4, Simulated Time = 39.0 ms
+Throughput = 0.10256 (102.56 kbps)
+Data Transmissions = 4 (Retransmissions = 0, Timeouts = 0)
+Mean Transmissions per Delivered Pkt = 1.0000
+Data Pkts in Error = 0, ACKs/NAKs in Error = 0
+ACKs Sent = 4, NAKs Sent = 0
+Mean Delay = 6.000 ms
